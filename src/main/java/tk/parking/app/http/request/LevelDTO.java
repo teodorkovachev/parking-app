@@ -18,7 +18,7 @@ import java.util.List;
 public class LevelDTO {
 
     @NotNull(message = "Missing level number")
-    private final Long level;
+    private final Integer level;
 
     @Valid
     @Size(min = 2)
