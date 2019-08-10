@@ -1,15 +1,19 @@
 package tk.parking.app.entity;
 
+import lombok.Builder;
 import lombok.Data;
+import tk.parking.app.common.VehicleType;
 
 import javax.persistence.*;
 
 @Entity
 @Data
-public class ParkingSpot extends ParkingLevelRefHolder{
+@Builder
+public class ParkingSpot {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long parkingSpotId;
 
-    private String vehicleType;
+    @Enumerated(EnumType.STRING)
+    private VehicleType vehicleType;
 }

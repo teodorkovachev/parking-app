@@ -1,5 +1,6 @@
 package tk.parking.app.entity;
 
+import lombok.Builder;
 import lombok.Data;
 
 import javax.persistence.*;
@@ -7,21 +8,23 @@ import java.util.List;
 
 @Data
 @Entity
+@Builder
 public class ParkingLevel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long levelId;
+
     private Long level;
 
-    @ManyToOne
-    @JoinColumn(name = "parking_id")
-    private Parking parking;
-
-    @OneToMany(mappedBy = "parkingLevel")
+    @OneToMany(cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "level_id")
     private List<ParkingEntry> entries;
 
-    @OneToMany(mappedBy = "parkingLevel")
+    @OneToMany(cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "level_id")
     private List<ParkingExit> parkingExits;
 
-    @OneToMany(mappedBy = "parkingLevel")
+    @OneToMany(cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "level_id")
     private List<ParkingSpot> parkingSpots;
 }
