@@ -21,7 +21,7 @@ public class ParkingController {
     @ResponseBody
     @ResponseStatus(HttpStatus.CREATED)
     @RequestMapping(method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public Long createParking(@Valid @RequestBody ParkingDTO parking) {
+    public Integer createParking(@Valid @RequestBody ParkingDTO parking) {
         log.info("Received a request");
         log.info(parking.toString());
         log.trace(parking.toString());

@@ -12,7 +12,7 @@ import javax.persistence.*;
 public class ParkingSpot {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long parkingSpotId;
+    private Integer parkingSpotId;
 
     @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;

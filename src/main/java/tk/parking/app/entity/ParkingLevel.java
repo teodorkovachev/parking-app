@@ -12,7 +12,7 @@ import java.util.List;
 public class ParkingLevel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long levelId;
+    private Integer levelId;
 
     private Integer level;
 

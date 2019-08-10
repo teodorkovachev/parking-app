@@ -14,7 +14,7 @@ import javax.persistence.Id;
 public class ParkingEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long entryId;
+    private Integer entryId;
 
     private String address;
 }
