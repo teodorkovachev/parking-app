@@ -18,8 +18,7 @@ public class ParkingServiceImpl implements ParkingService {
 
     @Override
     public Integer createParking(final ParkingDTO parkingDTO) {
-        final Parking parking = transformDTOtoEntity(parkingDTO);
-        return parkingRepo.save(parking).getParkingId();
+        return parkingRepo.save(transformDTOtoEntity(parkingDTO)).getParkingId();
     }
 
     private static Parking transformDTOtoEntity(final ParkingDTO parkingDTO) {
