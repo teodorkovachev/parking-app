@@ -1,7 +1,8 @@
 package tk.parking.app.service;
 
+import tk.parking.app.entity.Parking;
 import tk.parking.app.http.request.ParkingDTO;
 
 public interface ParkingService {
-    Integer createParking(final ParkingDTO parkingDTO);
+    Parking createParking(final ParkingDTO parkingDTO);
 }

@@ -25,6 +25,6 @@ public class ParkingController {
     public CreateParkingResponse createParking(@Valid @RequestBody ParkingDTO parking) {
         log.info("Received a request to create a new parking");
         log.trace(parking.toString());
-        return CreateParkingResponse.builder().parkingId(parkingService.createParking(parking)).build();
+        return CreateParkingResponse.builder().parking(parkingService.createParking(parking)).build();
     }
 }
