@@ -1,14 +1,17 @@
 package tk.parking.app.entity;
 
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 
 import javax.persistence.*;
 import java.util.List;
 
-@Data
 @Entity
 @Builder
+@Getter
+@Setter
+@ToString
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PACKAGE)
 public class ParkingLevel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

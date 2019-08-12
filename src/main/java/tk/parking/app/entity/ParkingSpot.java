@@ -1,14 +1,18 @@
 package tk.parking.app.entity;
 
-import lombok.Builder;
-import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.*;
 import tk.parking.app.common.VehicleType;
 
 import javax.persistence.*;
 
 @Entity
-@Data
 @Builder
+@Getter
+@Setter
+@ToString
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PACKAGE)
 public class ParkingSpot {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,4 +20,16 @@ public class ParkingSpot {
 
     @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;
+
+    @JsonIgnore
+    private String vehicleId;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "level_id")
+    private ParkingLevel parkingLevel;
+
+    @Version
+    @JsonIgnore
+    private long version;
 }
