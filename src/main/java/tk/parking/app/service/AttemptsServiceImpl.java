@@ -1,22 +1,27 @@
 package tk.parking.app.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.StaleObjectStateException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tk.parking.app.common.AttemptStatus;
+import tk.parking.app.common.FailReason;
 import tk.parking.app.common.VehicleType;
+import tk.parking.app.entity.EntryAttempt;
+import tk.parking.app.entity.ExitAttempt;
 import tk.parking.app.entity.ParkingExit;
 import tk.parking.app.entity.ParkingSpot;
 import tk.parking.app.exception.ConcurrentParkingEntryException;
-import tk.parking.app.http.request.EntryAttemptRequest;
 import tk.parking.app.http.request.ExitAttemptRequest;
+import tk.parking.app.http.response.AttemptResponse;
+import tk.parking.app.repo.EntryAttemptRepo;
+import tk.parking.app.repo.ExitAttemptRepo;
 import tk.parking.app.repo.ParkingSpotRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -28,41 +33,94 @@ public class AttemptsServiceImpl implements AttemptsService {
     @Autowired
     private ParkingSpotRepository parkingSpotRepository;
 
+    @Autowired
+    private EntryAttemptRepo entryAttemptRepo;
+
+    @Autowired
+    private ExitAttemptRepo exitAttemptRepo;
+
     @Override
-    public AttemptStatus attemptEntry(final int entryId, final VehicleType vehicleType, final String vehicleId) {
+    public AttemptResponse attemptEntry(final int entryId, final VehicleType vehicleType, final String vehicleId) {
         log.trace("Querying the database for free parking spots of type {} on level with entry id {}", vehicleType, entryId);
         List<ParkingSpot> freeParkingSpots = parkingSpotRepository.findFreeParkingSpotsByTypeAndEntry(vehicleType, entryId, PageRequest.of(0, 1));
-        log.trace("Found {} free parking spots of type {} on level with entry {}", freeParkingSpots.size(), vehicleType, entryId);
+        log.debug("Found {} free parking spots of type {} on level with entry {}", freeParkingSpots.size(), vehicleType, entryId);
+
+        //Create the entity builder and set some data that is going to be used almost certainly
+        final EntryAttempt.EntryAttemptBuilder entityBuilder = EntryAttempt.builder()
+                .entryId(entryId)
+                .vehicleId(vehicleId)
+                .vehicleType(vehicleType);
+        final AttemptResponse.AttemptResponseBuilder responseBuilder = AttemptResponse.builder();
+
         if (!freeParkingSpots.isEmpty()) {
             final ParkingSpot ps = freeParkingSpots.iterator().next();
             ps.setVehicleId(vehicleId);
             try {
+                //Perform flush, which in case of stale object will fire an exception or otherwise will block other
+                //threads trying to update the same record until this transaction is committed
                 parkingSpotRepository.flush();
-                //TODO Here write the entry attempt log success record
-                return AttemptStatus.SUCCESS;
+                //Create an attempt record
+                entryAttemptRepo.save(entityBuilder.status(AttemptStatus.SUCCESS).build());
+                //Create and return SUCCESS response
+                return responseBuilder.attemptStatus(AttemptStatus.SUCCESS).build();
             } catch (ObjectOptimisticLockingFailureException e) {
-                log.trace("Because of concurrent processing the selected parking spot was taken. Trying to find another one");
-                throw new ConcurrentParkingEntryException(vehicleType, vehicleId, entryId);
+                final String message = "Because of concurrent processing the selected parking spot was taken. Trying to find another one";
+                log.trace(message);
+                //Throwing a custom exception in order to retry the attempt with the same vehicle and entry
+                throw new ConcurrentParkingEntryException(message, vehicleType, vehicleId, entryId);
             }
         }
-        log.debug("There were not free parking spaces of type {} on level with entry {}. Rejecting parking request of vehicle {}", vehicleType, entryId, vehicleId);
-        //TODO here create the records for faile entry attempts
-        return AttemptStatus.FAILED;
+
+        log.debug("There were not free parking spaces of type {} on level with entry {}. " +
+                "Rejecting parking request of vehicle {}", vehicleType, entryId, vehicleId);
+        final String reason = "Not enough parking spaces";
+        entryAttemptRepo.save(entityBuilder.status(AttemptStatus.FAILED).reason(FailReason.NOT_ENOUGH_SPACE).build());
+        return responseBuilder.attemptStatus(AttemptStatus.FAILED).reason(FailReason.NOT_ENOUGH_SPACE).build();
     }
 
     @Override
-    public AttemptStatus attemptExit(final int exitId, final ExitAttemptRequest exitAttemptRequest) {
+    public AttemptResponse attemptExit(final int exitId, final ExitAttemptRequest exitAttemptRequest) {
         final String vehicleId = exitAttemptRequest.getVehicleId();
-        final ParkingSpot parkingSpot = parkingSpotRepository.findByVehicleId(vehicleId);
-        final Set<Integer> availableExitIds = parkingSpot.getParkingLevel().getParkingExits()
-                .stream().map(ParkingExit::getExitId).collect(Collectors.toSet());
-        if (availableExitIds.contains(exitId)) {
-            parkingSpot.setVehicleId(null);
-            return AttemptStatus.SUCCESS;
+        //Fint the parking spot where the vehicle is located
+        final Optional<ParkingSpot> parkingSpotOpt = parkingSpotRepository.findByVehicleId(vehicleId);
+
+        //Create the entity builder and set some data that is going to be used almost certainly
+        final ExitAttempt.ExitAttemptBuilder entityBuilder = ExitAttempt.builder()
+                .exitId(exitId)
+                .vehicleId(vehicleId);
+        //If the vehicle has been found within the parking
+        if (parkingSpotOpt.isPresent()) {
+            final ParkingSpot parkingSpot = parkingSpotOpt.get();
+            //Knowing the level, where the vehicle is located we can decide whether the exit is reachable
+            final Set<Integer> availableExitIds = parkingSpot.getParkingLevel().getParkingExits()
+                    .stream()
+                    .map(ParkingExit::getExitId)
+                    .collect(Collectors.toSet());
+            if (availableExitIds.contains(exitId)) {
+                parkingSpot.setVehicleId(null);
+                try {
+                    parkingSpotRepository.flush();
+                } catch (ObjectOptimisticLockingFailureException e) {
+                    //We are not interested at handling that, because the worst that might have happened is the spot
+                    // has been emptied by another thread
+                    log.debug("Vehicle with id {} might have left through another exit", vehicleId);
+                }
+                exitAttemptRepo.save(entityBuilder.status(AttemptStatus.SUCCESS).build());
+                return AttemptResponse.builder().attemptStatus(AttemptStatus.SUCCESS).build();
+            }
+            log.debug("Exit with id {} does not co-exist on the same level as the parking spot where vehicle with id {} is placed",
+                    exitId, vehicleId);
+            final String reason = "Entry is not on the same level as the vehicle";
+            exitAttemptRepo.save(entityBuilder.status(AttemptStatus.FAILED).reason(FailReason.EXIT_UNREACHABLE).build());
+            return AttemptResponse.builder()
+                    .attemptStatus(AttemptStatus.FAILED)
+                    .reason(FailReason.EXIT_UNREACHABLE).build();
         }
-        log.debug("Exit with id {} does not co-exist on the same level as the parking spot where vehicle with id {} is placed",
-                exitId, vehicleId);
-        //TODO here create the records for faile entry attempts
-        return AttemptStatus.FAILED;
+        final String reason = "No vehicle with such id found";
+        exitAttemptRepo.save(entityBuilder.status(AttemptStatus.FAILED).reason(FailReason.VEHICLE_NOT_FOUND).build());
+        return AttemptResponse.builder().
+                attemptStatus(AttemptStatus.FAILED).
+                reason(FailReason.VEHICLE_NOT_FOUND).
+                build();
     }
 }

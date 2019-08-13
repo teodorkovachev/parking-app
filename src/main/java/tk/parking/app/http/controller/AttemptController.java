@@ -39,12 +39,9 @@ public class AttemptController {
                 entryAttemptRequest.getVehicleId(),
                 entryAttemptRequest.getVehicleType(),
                 entryId);
-        return AttemptResponse
-                .builder()
-                .attemptStatus(attemptsService.attemptEntry(entryId,
-                        entryAttemptRequest.getVehicleType(),
-                        entryAttemptRequest.getVehicleId()))
-                .build();
+        return attemptsService.attemptEntry(entryId,
+                entryAttemptRequest.getVehicleType(),
+                entryAttemptRequest.getVehicleId());
     }
 
     @ResponseBody
@@ -59,10 +56,7 @@ public class AttemptController {
         log.info("Vehicle with ID: {} is trying to exit a parking through exit: {}",
                 exitAttemptRequest.getVehicleId(),
                 exitId);
-        return AttemptResponse
-                .builder()
-                .attemptStatus(attemptsService.attemptExit(exitId, exitAttemptRequest))
-                .build();
+        return attemptsService.attemptExit(exitId, exitAttemptRequest);
     }
 
     @ExceptionHandler(ConcurrentParkingEntryException.class)

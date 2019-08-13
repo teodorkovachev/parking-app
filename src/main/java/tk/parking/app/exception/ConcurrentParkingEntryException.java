@@ -10,7 +10,11 @@ public class ConcurrentParkingEntryException extends RuntimeException {
 
     public final VehicleType vehicleType;
 
-    public ConcurrentParkingEntryException(final VehicleType vehicleType, final String vehicleId, final int entryId) {
+    public ConcurrentParkingEntryException(final String message,
+                                           final VehicleType vehicleType,
+                                           final String vehicleId,
+                                           final int entryId) {
+        super(message);
         this.vehicleType = vehicleType;
         this.vehicleId = vehicleId;
         this.entryId = entryId;
