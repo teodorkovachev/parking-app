@@ -14,4 +14,6 @@ public interface ParkingSpotRepository extends JpaRepository<ParkingSpot, Intege
     List<ParkingSpot> findFreeParkingSpotsByTypeAndEntry(final VehicleType vehicleType, final int entryId, final Pageable pageable);
 
     Optional<ParkingSpot> findByVehicleId(final String vehicleId);
+
+    List<ParkingSpot> findByParkingLevel_Level(final int level);
 }
