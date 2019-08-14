@@ -10,8 +10,6 @@ import org.springframework.data.repository.CrudRepository;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tk.parking.app.common.AttemptStatus;
-import tk.parking.app.common.FailReason;
 import tk.parking.app.common.ParkingSegment;
 import tk.parking.app.common.VehicleType;
 import tk.parking.app.entity.EntryAttempt;
@@ -29,6 +27,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static tk.parking.app.common.AttemptStatus.FAILED;
+import static tk.parking.app.common.AttemptStatus.SUCCESS;
+import static tk.parking.app.common.FailReason.*;
 
 @Slf4j
 @Service
@@ -77,9 +79,9 @@ public class AttemptsServiceImpl implements AttemptsService {
                 //threads trying to update the same record until this transaction is committed
                 parkingSpotRepository.flush();
                 //Create an attempt record
-                entryAttemptRepo.save(entityBuilder.status(AttemptStatus.SUCCESS).build());
+                entryAttemptRepo.save(entityBuilder.status(SUCCESS).build());
                 //Create and return SUCCESS response
-                return responseBuilder.attemptStatus(AttemptStatus.SUCCESS).build();
+                return responseBuilder.attemptStatus(SUCCESS).build();
             } catch (ObjectOptimisticLockingFailureException e) {
                 log.trace("Because of concurrent processing the selected parking spot was taken. Trying to find another one");
                 //Throwing a custom exception in order to retry the attempt with the same vehicle and entry
@@ -101,8 +103,8 @@ public class AttemptsServiceImpl implements AttemptsService {
         log.debug("There were not free parking spaces of type {} on level with entry {}. " +
                 "Rejecting parking request of vehicle {}", vehicleType, entryId, vehicleId);
         final String reason = "Not enough parking spaces";
-        entryAttemptRepo.save(entityBuilder.status(AttemptStatus.FAILED).reason(FailReason.NOT_ENOUGH_SPACE).build());
-        return responseBuilder.attemptStatus(AttemptStatus.FAILED).reason(FailReason.NOT_ENOUGH_SPACE).build();
+        entryAttemptRepo.save(entityBuilder.status(FAILED).reason(NOT_ENOUGH_SPACE).build());
+        return responseBuilder.attemptStatus(FAILED).reason(NOT_ENOUGH_SPACE).build();
     }
 
     @Override
@@ -135,22 +137,22 @@ public class AttemptsServiceImpl implements AttemptsService {
                     // has been emptied by another thread
                     log.debug("Vehicle with id {} might have left through another exit", vehicleId);
                 }
-                exitAttemptRepo.save(entityBuilder.status(AttemptStatus.SUCCESS).build());
-                return AttemptResponse.builder().attemptStatus(AttemptStatus.SUCCESS).build();
+                exitAttemptRepo.save(entityBuilder.status(SUCCESS).build());
+                return AttemptResponse.builder().attemptStatus(SUCCESS).build();
             }
             log.debug("Exit with id {} does not co-exist on the same level as the parking spot where vehicle with id {} is placed",
                     exitId, vehicleId);
             final String reason = "Entry is not on the same level as the vehicle";
-            exitAttemptRepo.save(entityBuilder.status(AttemptStatus.FAILED).reason(FailReason.EXIT_UNREACHABLE).build());
+            exitAttemptRepo.save(entityBuilder.status(FAILED).reason(EXIT_UNREACHABLE).build());
             return AttemptResponse.builder()
-                    .attemptStatus(AttemptStatus.FAILED)
-                    .reason(FailReason.EXIT_UNREACHABLE).build();
+                    .attemptStatus(FAILED)
+                    .reason(EXIT_UNREACHABLE).build();
         }
         final String reason = "No vehicle with such id found";
-        exitAttemptRepo.save(entityBuilder.status(AttemptStatus.FAILED).reason(FailReason.VEHICLE_NOT_FOUND).build());
+        exitAttemptRepo.save(entityBuilder.status(FAILED).reason(VEHICLE_NOT_FOUND).build());
         return AttemptResponse.builder().
-                attemptStatus(AttemptStatus.FAILED).
-                reason(FailReason.VEHICLE_NOT_FOUND).
+                attemptStatus(FAILED).
+                reason(VEHICLE_NOT_FOUND).
                 build();
     }
 
@@ -160,12 +162,12 @@ public class AttemptsServiceImpl implements AttemptsService {
                 .entryId(entryId)
                 .vehicleId(vehicleId)
                 .vehicleType(vehicleType)
-                .reason(FailReason.DUPLICATE_VEHICLE)
-                .status(AttemptStatus.FAILED)
+                .reason(DUPLICATE_VEHICLE)
+                .status(FAILED)
                 .build());
         return AttemptResponse.builder()
-                .attemptStatus(AttemptStatus.FAILED)
-                .reason(FailReason.DUPLICATE_VEHICLE)
+                .attemptStatus(FAILED)
+                .reason(DUPLICATE_VEHICLE)
                 .build();
     }
 
