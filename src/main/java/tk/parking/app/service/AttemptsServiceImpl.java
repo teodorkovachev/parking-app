@@ -6,11 +6,13 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tk.parking.app.common.AttemptStatus;
 import tk.parking.app.common.FailReason;
+import tk.parking.app.common.ParkingSegment;
 import tk.parking.app.common.VehicleType;
 import tk.parking.app.entity.EntryAttempt;
 import tk.parking.app.entity.ExitAttempt;
@@ -18,11 +20,10 @@ import tk.parking.app.entity.ParkingExit;
 import tk.parking.app.entity.ParkingSpot;
 import tk.parking.app.exception.ConcurrentParkingEntryException;
 import tk.parking.app.exception.DuplicateVehicleException;
+import tk.parking.app.exception.SegmentNotFoundException;
 import tk.parking.app.http.request.ExitAttemptRequest;
 import tk.parking.app.http.response.AttemptResponse;
-import tk.parking.app.repo.EntryAttemptRepo;
-import tk.parking.app.repo.ExitAttemptRepo;
-import tk.parking.app.repo.ParkingSpotRepository;
+import tk.parking.app.repo.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -46,8 +47,17 @@ public class AttemptsServiceImpl implements AttemptsService {
     @Autowired
     private ExitAttemptRepo exitAttemptRepo;
 
+    @Autowired
+    private EntryRepo entryRepo;
+
+    @Autowired
+    private ExitRepo exitRepo;
+
     @Override
     public AttemptResponse attemptEntry(final int entryId, final VehicleType vehicleType, final String vehicleId) {
+        //First check whether the selected entry exists
+        checkSegmentExistence(entryRepo, ParkingSegment.ENTRY, entryId);
+
         log.trace("Querying the database for free parking spots of type {} on level with entry id {}", vehicleType, entryId);
         List<ParkingSpot> freeParkingSpots = parkingSpotRepository.findFreeParkingSpotsByTypeAndEntry(vehicleType, entryId, PageRequest.of(0, 1));
         log.debug("Found {} free parking spots of type {} on level with entry {}", freeParkingSpots.size(), vehicleType, entryId);
@@ -97,6 +107,9 @@ public class AttemptsServiceImpl implements AttemptsService {
 
     @Override
     public AttemptResponse attemptExit(final int exitId, final ExitAttemptRequest exitAttemptRequest) {
+        //First check whether the selected exit exists
+        checkSegmentExistence(exitRepo, ParkingSegment.EXIT, exitId);
+
         final String vehicleId = exitAttemptRequest.getVehicleId();
         //Fint the parking spot where the vehicle is located
         final Optional<ParkingSpot> parkingSpotOpt = parkingSpotRepository.findByVehicleId(vehicleId);
@@ -154,5 +167,13 @@ public class AttemptsServiceImpl implements AttemptsService {
                 .attemptStatus(AttemptStatus.FAILED)
                 .reason(FailReason.DUPLICATE_VEHICLE)
                 .build();
+    }
+
+    private void checkSegmentExistence(CrudRepository<?, Integer> repo, ParkingSegment segment, Integer segmentId) {
+        if (!repo.existsById(segmentId)) {
+            final String message = String.format("Segment of Type: %s and with id: %d was not found", segment, segmentId);
+            log.info(message);
+            throw new SegmentNotFoundException(message, segment);
+        }
     }
 }

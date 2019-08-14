@@ -24,10 +24,4 @@ public class ParkingSpotsController {
         log.trace("Requested all available parking spots. Parking Id: {}, Level: {}", parkingId, level);
         return parkingSpotService.getAllParkingSpots(parkingId, level);
     }
-
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    @ExceptionHandler(SegmentNotFoundException.class)
-    public NotFoundErrResponse handleSegmentNotFound(final SegmentNotFoundException e) {
-        return NotFoundErrResponse.builder().notFound(e.segment).build();
-    }
 }
