@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import tk.parking.app.exception.ConcurrentParkingEntryException;
+import tk.parking.app.exception.DuplicateVehicleException;
 import tk.parking.app.http.request.EntryAttemptRequest;
 import tk.parking.app.http.request.ExitAttemptRequest;
 import tk.parking.app.http.response.AttemptResponse;
@@ -62,5 +63,10 @@ public class AttemptController {
     @ExceptionHandler(ConcurrentParkingEntryException.class)
     public AttemptResponse retryAfterOptimisticLockFailure(final HttpServletRequest request, final ConcurrentParkingEntryException e) {
         return retryAttemptService.retryRequest(request.getRequestURL().toString(), e.vehicleId, e.vehicleType);
+    }
+
+    @ExceptionHandler(DuplicateVehicleException.class)
+    public AttemptResponse handleDuplicateVehicle(final DuplicateVehicleException e) {
+        return attemptsService.handleVehicleDuplication(e.vehicleType, e.vehicleId, e.entryId);
     }
 }

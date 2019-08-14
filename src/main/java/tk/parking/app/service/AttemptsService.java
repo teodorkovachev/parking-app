@@ -8,4 +8,6 @@ public interface AttemptsService {
     AttemptResponse attemptEntry(final int entryId, final VehicleType vehicleType, final String vehicleId);
 
     AttemptResponse attemptExit(final int exitId, final ExitAttemptRequest exitAttemptRequest);
+
+    AttemptResponse handleVehicleDuplication(final VehicleType vehicleType, final String vehicleId, final int entryId);
 }

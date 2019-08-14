@@ -17,6 +17,9 @@ public class ParkingLevel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer levelId;
 
+    @Column(name = "parking_id")
+    private Integer parkingId;
+
     private Integer level;
 
     @OneToMany(cascade = CascadeType.PERSIST)

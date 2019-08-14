@@ -5,5 +5,5 @@ import tk.parking.app.entity.ParkingSpot;
 import java.util.List;
 
 public interface ParkingSpotService {
-    List<ParkingSpot> getAllParkingSpots(final Integer levelFilter);
+    List<ParkingSpot> getAllParkingSpots(final int parkingId, final Integer levelFilter);
 }

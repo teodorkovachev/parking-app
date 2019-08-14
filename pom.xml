@@ -73,7 +73,14 @@
 			<version>2.9.2</version>
 		</dependency>
 
-	</dependencies>
+        <!-- https://mvnrepository.com/artifact/com.microsoft.sqlserver/mssql-jdbc -->
+        <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+            <version>7.4.1.jre8</version>
+        </dependency>
+
+    </dependencies>
 
     <build>
         <plugins>

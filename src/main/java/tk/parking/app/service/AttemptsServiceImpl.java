@@ -1,7 +1,10 @@
 package tk.parking.app.service;
 
+import com.microsoft.sqlserver.jdbc.SQLServerException;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -14,6 +17,7 @@ import tk.parking.app.entity.ExitAttempt;
 import tk.parking.app.entity.ParkingExit;
 import tk.parking.app.entity.ParkingSpot;
 import tk.parking.app.exception.ConcurrentParkingEntryException;
+import tk.parking.app.exception.DuplicateVehicleException;
 import tk.parking.app.http.request.ExitAttemptRequest;
 import tk.parking.app.http.response.AttemptResponse;
 import tk.parking.app.repo.EntryAttemptRepo;
@@ -29,6 +33,9 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class AttemptsServiceImpl implements AttemptsService {
+
+    private static final int MSSQL_UNIQUE_INDEX_VIOLATION = 2601;
+    private static final int MSSQL_UNIQUE_CONSTR_VIOLATION = 2627;
 
     @Autowired
     private ParkingSpotRepository parkingSpotRepository;
@@ -64,10 +71,20 @@ public class AttemptsServiceImpl implements AttemptsService {
                 //Create and return SUCCESS response
                 return responseBuilder.attemptStatus(AttemptStatus.SUCCESS).build();
             } catch (ObjectOptimisticLockingFailureException e) {
-                final String message = "Because of concurrent processing the selected parking spot was taken. Trying to find another one";
-                log.trace(message);
+                log.trace("Because of concurrent processing the selected parking spot was taken. Trying to find another one");
                 //Throwing a custom exception in order to retry the attempt with the same vehicle and entry
-                throw new ConcurrentParkingEntryException(message, vehicleType, vehicleId, entryId);
+                throw new ConcurrentParkingEntryException(vehicleType, vehicleId, entryId);
+            } catch (DataIntegrityViolationException dive) {
+                if (dive.getCause() instanceof ConstraintViolationException
+                        && dive.getCause().getCause() instanceof SQLServerException) {
+                    SQLServerException sqlServerException = (SQLServerException) dive.getCause().getCause();
+                    if (sqlServerException.getErrorCode() == MSSQL_UNIQUE_CONSTR_VIOLATION
+                            || sqlServerException.getErrorCode() == MSSQL_UNIQUE_INDEX_VIOLATION) {
+                        log.info("Vehicle with id {} is already parked. Request failure", vehicleId);
+                        throw new DuplicateVehicleException(vehicleType, vehicleId, entryId);
+                    }
+                }
+                throw dive;
             }
         }
 
@@ -122,5 +139,20 @@ public class AttemptsServiceImpl implements AttemptsService {
                 attemptStatus(AttemptStatus.FAILED).
                 reason(FailReason.VEHICLE_NOT_FOUND).
                 build();
+    }
+
+    @Override
+    public AttemptResponse handleVehicleDuplication(VehicleType vehicleType, String vehicleId, int entryId) {
+        entryAttemptRepo.save(EntryAttempt.builder()
+                .entryId(entryId)
+                .vehicleId(vehicleId)
+                .vehicleType(vehicleType)
+                .reason(FailReason.DUPLICATE_VEHICLE)
+                .status(AttemptStatus.FAILED)
+                .build());
+        return AttemptResponse.builder()
+                .attemptStatus(AttemptStatus.FAILED)
+                .reason(FailReason.DUPLICATE_VEHICLE)
+                .build();
     }
 }

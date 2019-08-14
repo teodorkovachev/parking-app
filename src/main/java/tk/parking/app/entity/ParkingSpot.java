@@ -21,7 +21,6 @@ public class ParkingSpot {
     @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;
 
-    @JsonIgnore
     private String vehicleId;
 
     @JsonIgnore
